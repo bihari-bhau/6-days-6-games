@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BREAKOUT — Day 2 of 6</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #04020e;
+    --panel: #08051a;
+    --neon-blue: #00d4ff;
+    --neon-pink: #ff0080;
+    --neon-yellow: #ffee00;
+    --neon-green: #00ff88;
+    --neon-orange: #ff6600;
+    --neon-purple: #cc00ff;
+    --text: #e0e0ff;
+    --muted: #44446a;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    overflow: hidden;
+  }
+
+  /* Starfield bg */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.4) 0%, transparent 100%),
+      radial-gradient(1px 1px at 30% 60%, rgba(255,255,255,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 50% 10%, rgba(255,255,255,0.5) 0%, transparent 100%),
+      radial-gradient(1px 1px at 70% 80%, rgba(255,255,255,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 90% 40%, rgba(255,255,255,0.4) 0%, transparent 100%),
+      radial-gradient(1px 1px at 15% 85%, rgba(255,255,255,0.2) 0%, transparent 100%),
+      radial-gradient(1px 1px at 80% 15%, rgba(255,255,255,0.4) 0%, transparent 100%),
+      radial-gradient(1px 1px at 45% 45%, rgba(255,255,255,0.3) 0%, transparent 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 0.75rem;
+  }
+
+  .series-tag {
+    font-size: 0.6rem;
+    letter-spacing: 0.25em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+  }
+
+  .game-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(2rem, 7vw, 3.2rem);
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    color: var(--neon-blue);
+    text-shadow:
+      0 0 10px var(--neon-blue),
+      0 0 30px rgba(0,212,255,0.5),
+      0 0 60px rgba(0,212,255,0.2);
+  }
+
+  .hud {
+    display: flex;
+    gap: 2.5rem;
+    margin-bottom: 0.75rem;
+    align-items: center;
+  }
+
+  .stat { text-align: center; }
+  .stat-label {
+    font-size: 0.55rem;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .stat-value {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--neon-yellow);
+    text-shadow: 0 0 10px rgba(255,238,0,0.6);
+  }
+
+  .lives-display {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-top: 2px;
+  }
+
+  .heart {
+    width: 12px; height: 12px;
+    background: var(--neon-pink);
+    clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+    box-shadow: 0 0 6px var(--neon-pink);
+    transition: opacity 0.3s;
+  }
+  .heart.dead { opacity: 0.15; }
+
+  .canvas-wrapper {
+    position: relative;
+    border: 1px solid rgba(0,212,255,0.3);
+    box-shadow:
+      0 0 20px rgba(0,212,255,0.1),
+      inset 0 0 20px rgba(0,0,20,0.5);
+    background: var(--panel);
+  }
+
+  /* Corner accents */
+  .canvas-wrapper::before, .canvas-wrapper::after {
+    content: '';
+    position: absolute;
+    width: 16px; height: 16px;
+    border-color: var(--neon-blue);
+    border-style: solid;
+    z-index: 2;
+  }
+  .canvas-wrapper::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
+  .canvas-wrapper::after  { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+
+  #gameCanvas { display: block; }
+
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(4,2,14,0.9);
+    backdrop-filter: blur(3px);
+    z-index: 10;
+    transition: opacity 0.3s;
+    gap: 0.5rem;
+  }
+
+  .overlay.hidden { opacity: 0; pointer-events: none; }
+
+  .ov-tag {
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+
+  .ov-title {
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 900;
+    font-size: clamp(1.5rem, 5vw, 2.2rem);
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+  }
+
+  .ov-score {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 3rem;
+    font-weight: 700;
+    color: var(--neon-yellow);
+    text-shadow: 0 0 20px rgba(255,238,0,0.5);
+    line-height: 1;
+  }
+
+  .ov-best {
+    font-size: 0.6rem;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    margin-bottom: 1.5rem;
+  }
+
+  .btn {
+    background: transparent;
+    border: 1px solid var(--neon-blue);
+    color: var(--neon-blue);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    padding: 0.75rem 2rem;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.15s;
+    text-shadow: 0 0 8px rgba(0,212,255,0.5);
+    box-shadow: 0 0 10px rgba(0,212,255,0.1);
+  }
+  .btn:hover {
+    background: var(--neon-blue);
+    color: var(--bg);
+    box-shadow: 0 0 20px rgba(0,212,255,0.4);
+    text-shadow: none;
+  }
+
+  .instructions {
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 0.75rem;
+    line-height: 1.8;
+  }
+  .instructions span { color: rgba(224,224,255,0.5); }
+
+  /* Paddle slider for mobile */
+  .mobile-ctrl {
+    display: none;
+    width: 100%;
+    max-width: 400px;
+    margin-top: 0.75rem;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  @media (max-width: 600px) {
+    .mobile-ctrl { display: flex; }
+  }
+
+  #paddleSlider {
+    width: 100%;
+    -webkit-appearance: none;
+    height: 2px;
+    background: var(--muted);
+    outline: none;
+    accent-color: var(--neon-blue);
+  }
+  #paddleSlider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--neon-blue);
+    box-shadow: 0 0 10px var(--neon-blue);
+    cursor: pointer;
+  }
+
+  .mobile-hint {
+    font-size: 0.55rem;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div class="series-tag">6 Days · 6 Games · Day 02</div>
+    <div class="game-title">BREAKOUT</div>
+  </div>
+
+  <div class="hud">
+    <div class="stat">
+      <div class="stat-label">Score</div>
+      <div class="stat-value" id="score">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Best</div>
+      <div class="stat-value" id="best">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Level</div>
+      <div class="stat-value" id="level">1</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Lives</div>
+      <div class="lives-display" id="lives">
+        <div class="heart" id="h1"></div>
+        <div class="heart" id="h2"></div>
+        <div class="heart" id="h3"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="canvas-wrapper" id="canvasWrapper">
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Start -->
+    <div class="overlay" id="startOverlay">
+      <div class="ov-tag">Day 02 of 06</div>
+      <div class="ov-title" style="color:var(--neon-blue)">BREAKOUT</div>
+      <div style="color:var(--muted);font-size:0.65rem;letter-spacing:0.1em;margin-bottom:1.5rem">ARCADE CLASSIC</div>
+      <button class="btn" onclick="startGame()">▶ &nbsp;Launch Ball</button>
+    </div>
+
+    <!-- Game Over -->
+    <div class="overlay hidden" id="gameOverOverlay">
+      <div class="ov-title" style="color:var(--neon-pink);text-shadow:0 0 20px rgba(255,0,128,0.5)">GAME OVER</div>
+      <div class="ov-score" id="finalScore">0</div>
+      <div class="ov-best" id="finalBest">BEST — 0</div>
+      <button class="btn" onclick="startGame()">↻ &nbsp;Try Again</button>
+    </div>
+
+    <!-- Win -->
+    <div class="overlay hidden" id="winOverlay">
+      <div class="ov-title" style="color:var(--neon-green);text-shadow:0 0 20px rgba(0,255,136,0.5)">CLEARED!</div>
+      <div class="ov-score" id="winScore">0</div>
+      <div class="ov-best" id="winBest">BEST — 0</div>
+      <button class="btn" style="border-color:var(--neon-green);color:var(--neon-green)" onclick="nextLevel()">▶ &nbsp;Next Level</button>
+    </div>
+
+    <!-- Pause -->
+    <div class="overlay hidden" id="pauseOverlay">
+      <div class="ov-title" style="color:var(--neon-yellow)">PAUSED</div>
+      <button class="btn" style="border-color:var(--neon-yellow);color:var(--neon-yellow)" onclick="togglePause()">▶ &nbsp;Resume</button>
+    </div>
+  </div>
+
+  <!-- Mobile slider -->
+  <div class="mobile-ctrl">
+    <input type="range" id="paddleSlider" min="0" max="100" value="50">
+    <div class="mobile-hint">drag to move paddle</div>
+  </div>
+
+  <div class="instructions">
+    <span>← →</span> or Mouse to move paddle &nbsp;·&nbsp; <span>P</span> to pause &nbsp;·&nbsp; <span>Space</span> to launch
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Sizing
+const BASE_W = 400, BASE_H = 500;
+let scale = 1;
+
+function resize() {
+  const maxW = Math.min(window.innerWidth - 32, BASE_W);
+  scale = maxW / BASE_W;
+  canvas.width = Math.round(BASE_W * scale);
+  canvas.height = Math.round(BASE_H * scale);
+  if (paddle) {
+    paddle.w = 70 * scale;
+    paddle.h = 10 * scale;
+    paddle.y = (BASE_H - 30) * scale;
+  }
+}
+
+// Game state
+let paddle, ball, bricks, score, best, lives, level, running, paused, launched;
+let particles = [];
+let shakeFrames = 0;
+let combo = 0;
+let comboTimer = 0;
+
+const ROWS = 6, COLS = 10;
+const BRICK_COLORS = [
+  { fill: '#ff0080', glow: 'rgba(255,0,128,0.6)', pts: 60 },  // row 1 - pink
+  { fill: '#cc00ff', glow: 'rgba(204,0,255,0.6)', pts: 50 },  // row 2 - purple
+  { fill: '#00d4ff', glow: 'rgba(0,212,255,0.6)', pts: 40 },  // row 3 - blue
+  { fill: '#00ff88', glow: 'rgba(0,255,136,0.6)', pts: 30 },  // row 4 - green
+  { fill: '#ffee00', glow: 'rgba(255,238,0,0.6)', pts: 20 },  // row 5 - yellow
+  { fill: '#ff6600', glow: 'rgba(255,102,0,0.6)', pts: 10 },  // row 6 - orange
+];
+
+function initGame() {
+  score = 0;
+  lives = 3;
+  level = 1;
+  combo = 0;
+  particles = [];
+  best = parseInt(localStorage.getItem('breakoutBest')) || 0;
+  initLevel();
+}
+
+function initLevel() {
+  launched = false;
+  comboTimer = 0;
+  combo = 0;
+
+  paddle = {
+    x: (BASE_W / 2 - 35) * scale,
+    y: (BASE_H - 30) * scale,
+    w: 70 * scale,
+    h: 10 * scale,
+    speed: 7 * scale,
+  };
+
+  const speed = (3.5 + (level - 1) * 0.4) * scale;
+  ball = {
+    x: BASE_W / 2 * scale,
+    y: (BASE_H - 50) * scale,
+    vx: speed * (Math.random() > 0.5 ? 1 : -1),
+    vy: -speed,
+    r: 6 * scale,
+    trail: [],
+  };
+
+  buildBricks();
+  updateHUD();
+}
+
+function buildBricks() {
+  bricks = [];
+  const bw = (BASE_W - 20) / COLS;
+  const bh = 14;
+  const startY = 40;
+
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const hp = (ROWS - r <= 2 && level >= 3) ? 2 : 1;
+      bricks.push({
+        x: (10 + c * bw) * scale,
+        y: (startY + r * (bh + 4)) * scale,
+        w: (bw - 3) * scale,
+        h: bh * scale,
+        color: BRICK_COLORS[r],
+        alive: true,
+        hp,
+        maxHp: hp,
+        hitFlash: 0,
+      });
+    }
+  }
+}
+
+// Keys
+const keys = {};
+document.addEventListener('keydown', e => {
+  keys[e.key] = true;
+  if (e.key === ' ') { e.preventDefault(); if (!launched && running && !paused) launchBall(); }
+  if (e.key === 'p' || e.key === 'P') togglePause();
+});
+document.addEventListener('keyup', e => { keys[e.key] = false; });
+
+// Mouse
+let mouseX = null;
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  mouseX = e.clientX - rect.left;
+});
+canvas.addEventListener('mouseleave', () => { mouseX = null; });
+canvas.addEventListener('click', () => { if (!launched && running && !paused) launchBall(); });
+
+// Touch
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  mouseX = e.touches[0].clientX - rect.left;
+}, { passive: false });
+canvas.addEventListener('touchstart', e => {
+  if (!launched && running && !paused) launchBall();
+}, { passive: true });
+
+// Slider
+const slider = document.getElementById('paddleSlider');
+slider.addEventListener('input', () => {
+  if (!paddle) return;
+  const pct = slider.value / 100;
+  paddle.x = pct * (canvas.width - paddle.w);
+});
+
+function launchBall() {
+  launched = true;
+}
+
+function togglePause() {
+  if (!running) return;
+  paused = !paused;
+  document.getElementById('pauseOverlay').classList.toggle('hidden', !paused);
+}
+
+function startGame() {
+  hideOverlays();
+  running = true;
+  paused = false;
+  initGame();
+  loop();
+}
+
+function nextLevel() {
+  hideOverlays();
+  level++;
+  initLevel();
+  updateHUD();
+}
+
+function hideOverlays() {
+  ['startOverlay','gameOverOverlay','winOverlay','pauseOverlay'].forEach(id =>
+    document.getElementById(id).classList.add('hidden'));
+}
+
+function updateHUD() {
+  document.getElementById('score').textContent = score;
+  document.getElementById('best').textContent = best;
+  document.getElementById('level').textContent = level;
+  ['h1','h2','h3'].forEach((id, i) => {
+    document.getElementById(id).classList.toggle('dead', i >= lives);
+  });
+}
+
+// Particles
+function spawnParticles(x, y, color, count = 10) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = (1 + Math.random() * 3) * scale;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 1,
+      decay: 0.025 + Math.random() * 0.035,
+      r: (2 + Math.random() * 3) * scale,
+      color,
+    });
+  }
+}
+
+function updateParticles() {
+  particles = particles.filter(p => p.life > 0);
+  particles.forEach(p => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.08 * scale;
+    p.life -= p.decay;
+    p.vx *= 0.97;
+  });
+}
+
+function drawParticles() {
+  particles.forEach(p => {
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = p.color;
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 4;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
+}
+
+let lastTime = 0;
+function loop(ts = 0) {
+  if (!running) return;
+  requestAnimationFrame(loop);
+  const dt = Math.min(ts - lastTime, 50);
+  lastTime = ts;
+  update(dt);
+  draw();
+}
+
+function update(dt) {
+  if (paused) return;
+  if (shakeFrames > 0) shakeFrames--;
+  if (comboTimer > 0) comboTimer--;
+  else combo = 0;
+
+  updateParticles();
+
+  // Paddle movement
+  if (mouseX !== null) {
+    paddle.x = mouseX - paddle.w / 2;
+  } else {
+    if (keys['ArrowLeft'] || keys['a'] || keys['A']) paddle.x -= paddle.speed;
+    if (keys['ArrowRight'] || keys['d'] || keys['D']) paddle.x += paddle.speed;
+  }
+  paddle.x = Math.max(0, Math.min(canvas.width - paddle.w, paddle.x));
+
+  if (!launched) {
+    ball.x = paddle.x + paddle.w / 2;
+    ball.y = paddle.y - ball.r - 2;
+    return;
+  }
+
+  // Ball movement
+  ball.trail.push({x: ball.x, y: ball.y});
+  if (ball.trail.length > 8) ball.trail.shift();
+
+  ball.x += ball.vx;
+  ball.y += ball.vy;
+
+  // Wall bounce
+  if (ball.x - ball.r <= 0) { ball.x = ball.r; ball.vx = Math.abs(ball.vx); }
+  if (ball.x + ball.r >= canvas.width) { ball.x = canvas.width - ball.r; ball.vx = -Math.abs(ball.vx); }
+  if (ball.y - ball.r <= 0) { ball.y = ball.r; ball.vy = Math.abs(ball.vy); }
+
+  // Paddle collision
+  if (
+    ball.y + ball.r >= paddle.y &&
+    ball.y + ball.r <= paddle.y + paddle.h + Math.abs(ball.vy) &&
+    ball.x >= paddle.x - ball.r &&
+    ball.x <= paddle.x + paddle.w + ball.r &&
+    ball.vy > 0
+  ) {
+    const hit = (ball.x - (paddle.x + paddle.w / 2)) / (paddle.w / 2);
+    const angle = hit * (Math.PI / 3);
+    const spd = Math.sqrt(ball.vx**2 + ball.vy**2);
+    ball.vx = spd * Math.sin(angle);
+    ball.vy = -spd * Math.cos(angle);
+    ball.y = paddle.y - ball.r;
+    spawnParticles(ball.x, paddle.y, '#00d4ff', 5);
+  }
+
+  // Ball out
+  if (ball.y - ball.r > canvas.height) {
+    lives--;
+    shakeFrames = 15;
+    updateHUD();
+    if (lives <= 0) {
+      running = false;
+      best = Math.max(best, score);
+      localStorage.setItem('breakoutBest', best);
+      document.getElementById('finalScore').textContent = score;
+      document.getElementById('finalBest').textContent = `BEST — ${best}`;
+      document.getElementById('gameOverOverlay').classList.remove('hidden');
+    } else {
+      launched = false;
+      ball.trail = [];
+      ball.x = paddle.x + paddle.w / 2;
+      ball.y = paddle.y - ball.r - 2;
+      const spd = (3.5 + (level-1)*0.4) * scale;
+      ball.vx = spd * (Math.random() > 0.5 ? 1 : -1);
+      ball.vy = -spd;
+    }
+    return;
+  }
+
+  // Brick collision
+  let hitBrick = false;
+  for (const b of bricks) {
+    if (!b.alive) continue;
+    if (
+      ball.x + ball.r > b.x &&
+      ball.x - ball.r < b.x + b.w &&
+      ball.y + ball.r > b.y &&
+      ball.y - ball.r < b.y + b.h
+    ) {
+      b.hp--;
+      b.hitFlash = 6;
+      if (b.hp <= 0) {
+        b.alive = false;
+        combo++;
+        comboTimer = 40;
+        const pts = b.color.pts * level * (combo > 2 ? 2 : 1);
+        score += pts;
+        best = Math.max(best, score);
+        localStorage.setItem('breakoutBest', best);
+        spawnParticles(b.x + b.w/2, b.y + b.h/2, b.color.fill, 12);
+        updateHUD();
+      } else {
+        spawnParticles(b.x + b.w/2, b.y + b.h/2, '#ffffff', 4);
+      }
+      hitBrick = true;
+
+      // Deflect
+      const overlapL = (ball.x + ball.r) - b.x;
+      const overlapR = (b.x + b.w) - (ball.x - ball.r);
+      const overlapT = (ball.y + ball.r) - b.y;
+      const overlapB = (b.y + b.h) - (ball.y - ball.r);
+      const minH = Math.min(overlapL, overlapR);
+      const minV = Math.min(overlapT, overlapB);
+      if (minH < minV) ball.vx = -ball.vx;
+      else ball.vy = -ball.vy;
+      break;
+    }
+  }
+
+  // Check win
+  if (bricks.every(b => !b.alive)) {
+    running = false;
+    best = Math.max(best, score);
+    localStorage.setItem('breakoutBest', best);
+    document.getElementById('winScore').textContent = score;
+    document.getElementById('winBest').textContent = `BEST — ${best}`;
+    document.getElementById('winOverlay').classList.remove('hidden');
+  }
+}
+
+function draw() {
+  // Shake
+  ctx.save();
+  if (shakeFrames > 0) {
+    const s = shakeFrames * 1.5;
+    ctx.translate((Math.random()-0.5)*s, (Math.random()-0.5)*s);
+  }
+
+  // Background
+  ctx.fillStyle = '#04020e';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Subtle grid
+  ctx.strokeStyle = 'rgba(0,212,255,0.03)';
+  ctx.lineWidth = 0.5;
+  const gridSize = 20 * scale;
+  for (let x = 0; x < canvas.width; x += gridSize) {
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke();
+  }
+  for (let y = 0; y < canvas.height; y += gridSize) {
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke();
+  }
+
+  drawParticles();
+  drawBricks();
+  drawPaddle();
+  drawBall();
+  drawCombo();
+
+  ctx.restore();
+}
+
+function drawBricks() {
+  bricks.forEach(b => {
+    if (!b.alive) return;
+    if (b.hitFlash > 0) b.hitFlash--;
+    const flash = b.hitFlash > 0;
+
+    ctx.shadowColor = b.color.glow;
+    ctx.shadowBlur = flash ? 20 : 8;
+    ctx.fillStyle = flash ? '#ffffff' : b.color.fill;
+
+    // HP indicator for tough bricks
+    if (b.maxHp > 1 && b.hp < b.maxHp) {
+      ctx.globalAlpha = 0.6;
+    }
+
+    ctx.beginPath();
+    ctx.roundRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2, 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Shine
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.roundRect(b.x + 2, b.y + 1, b.w - 4, b.h / 3, 1);
+    ctx.fill();
+  });
+  ctx.shadowBlur = 0;
+}
+
+function drawPaddle() {
+  const grad = ctx.createLinearGradient(paddle.x, paddle.y, paddle.x, paddle.y + paddle.h);
+  grad.addColorStop(0, '#00d4ff');
+  grad.addColorStop(1, '#0088cc');
+  ctx.fillStyle = grad;
+  ctx.shadowColor = '#00d4ff';
+  ctx.shadowBlur = 15;
+  ctx.beginPath();
+  ctx.roundRect(paddle.x, paddle.y, paddle.w, paddle.h, paddle.h/2);
+  ctx.fill();
+
+  // Shine
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.shadowBlur = 0;
+  ctx.beginPath();
+  ctx.roundRect(paddle.x + 4, paddle.y + 1, paddle.w - 8, paddle.h * 0.4, 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+}
+
+function drawBall() {
+  // Trail
+  ball.trail.forEach((t, i) => {
+    const alpha = (i / ball.trail.length) * 0.4;
+    const r = ball.r * (i / ball.trail.length) * 0.8;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#00d4ff';
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, r, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+
+  // Ball
+  ctx.shadowColor = '#00d4ff';
+  ctx.shadowBlur = 20;
+  const grad = ctx.createRadialGradient(ball.x - ball.r*0.3, ball.y - ball.r*0.3, 0, ball.x, ball.y, ball.r);
+  grad.addColorStop(0, '#ffffff');
+  grad.addColorStop(0.4, '#00d4ff');
+  grad.addColorStop(1, '#0055aa');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Launch hint
+  if (!launched) {
+    ctx.fillStyle = 'rgba(0,212,255,0.5)';
+    ctx.font = `${0.6 * 14}px 'Share Tech Mono'`;
+    ctx.textAlign = 'center';
+    ctx.fillText('CLICK / SPACE TO LAUNCH', canvas.width/2, canvas.height - 8 * scale);
+  }
+}
+
+function drawCombo() {
+  if (combo >= 2 && comboTimer > 0) {
+    const alpha = Math.min(1, comboTimer / 15);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#ffee00';
+    ctx.shadowColor = '#ffee00';
+    ctx.shadowBlur = 10;
+    ctx.font = `bold ${18 * scale}px 'Orbitron', sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText(`${combo}× COMBO!`, canvas.width / 2, 28 * scale);
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+  }
+}
+
+// Init
+resize();
+best = parseInt(localStorage.getItem('breakoutBest')) || 0;
+document.getElementById('best').textContent = best;
+
+window.addEventListener('resize', () => {
+  const prevScale = scale;
+  resize();
+  const ratio = scale / prevScale;
+  if (ball) { ball.x *= ratio; ball.y *= ratio; ball.vx *= ratio; ball.vy *= ratio; ball.r *= ratio; ball.trail = []; }
+  if (paddle) { paddle.x *= ratio; paddle.y *= ratio; paddle.w *= ratio; paddle.h *= ratio; paddle.speed *= ratio; }
+  bricks && bricks.forEach(b => { b.x*=ratio; b.y*=ratio; b.w*=ratio; b.h*=ratio; });
+});
+</script>
+</body>
+</html>

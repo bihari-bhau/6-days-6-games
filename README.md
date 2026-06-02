@@ -8,7 +8,7 @@ One mini game a day for 6 days. Each game is a single `index.html` — no depend
 | Day | Game | Status |
 |-----|------|--------|
 | 01 | 🐍 Snake | ✅ Live |
-| 02 | 🧱 Breakout | Coming |
+| 02 | 🧱 Breakout | ✅ Live |
 | 03 | 💣 Minesweeper | Coming |
 | 04 | 🎯 Reaction Tester | Coming |
 | 05 | 🔢 2048 | Coming |

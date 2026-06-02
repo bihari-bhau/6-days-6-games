@@ -14,7 +14,7 @@ h1{font-family:'Syne',sans-serif;font-size:clamp(2rem,8vw,3.5rem);font-weight:80
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;width:100%;max-width:700px}
 .card{border:1px solid #1e1e2e;background:#111118;padding:1.5rem 1.25rem;text-decoration:none;color:inherit;transition:border-color .2s,transform .2s;position:relative;overflow:hidden}
 .card:hover{border-color:#00ff88;transform:translateY(-2px)}
-.card.locked{opacity:.35;cursor:not-allowed}
+.card.locked{opacity:.35;cursor:not-allowed;pointer-events:none}
 .day{font-size:.55rem;letter-spacing:.15em;color:#555566;text-transform:uppercase;margin-bottom:.5rem}
 .name{font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;margin-bottom:.25rem}
 .card:not(.locked) .name{color:#00ff88}
@@ -26,12 +26,8 @@ h1{font-family:'Syne',sans-serif;font-size:clamp(2rem,8vw,3.5rem);font-weight:80
 <h1>6 GAMES</h1>
 <div class="sub">6 days · 6 games · 1 file each</div>
 <div class="grid">
-  <a class="card" href="day-01-snake/">
-    <div class="day">Day 01</div>
-    <div class="name">🐍 Snake</div>
-    <div class="status">▶ Play now</div>
-  </a>
-  <div class="card locked"><div class="day">Day 02</div><div class="name">🧱 Breakout</div><div class="status">Coming soon</div></div>
+  <a class="card" href="day-01-snake/"><div class="day">Day 01</div><div class="name">🐍 Snake</div><div class="status">▶ Play now</div></a>
+  <a class="card" href="day-02-breakout/"><div class="day">Day 02</div><div class="name">🧱 Breakout</div><div class="status">▶ Play now</div></a>
   <div class="card locked"><div class="day">Day 03</div><div class="name">💣 Minesweeper</div><div class="status">Coming soon</div></div>
   <div class="card locked"><div class="day">Day 04</div><div class="name">🎯 Reaction</div><div class="status">Coming soon</div></div>
   <div class="card locked"><div class="day">Day 05</div><div class="name">🔢 2048</div><div class="status">Coming soon</div></div>
