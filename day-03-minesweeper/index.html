@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MINESWEEPER — Day 3 of 6</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #1a1208;
+  --panel: #231a0a;
+  --cell: #2e2210;
+  --cell-open: #1a1208;
+  --border-dark: #0e0b05;
+  --border-light: #4a3820;
+  --accent: #d4a017;
+  --accent2: #e8c547;
+  --danger: #cc3300;
+  --safe: #44aa66;
+  --text: #e8d5a0;
+  --muted: #6b5530;
+  --flag: #e83a1e;
+  --mine: #1a1208;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  user-select: none;
+}
+
+/* Aged paper texture overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  opacity: 0.6;
+  z-index: 0;
+}
+
+.wrap { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; }
+
+.header { text-align: center; }
+.series-tag { font-size: 0.58rem; letter-spacing: 0.25em; color: var(--muted); text-transform: uppercase; margin-bottom: 0.3rem; }
+.game-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(2.8rem, 9vw, 4.5rem);
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  line-height: 1;
+  text-shadow: 2px 2px 0 #0e0b05, 4px 4px 0 rgba(0,0,0,0.3);
+}
+
+/* Difficulty selector */
+.diff-bar {
+  display: flex;
+  gap: 0.5rem;
+  background: var(--panel);
+  border: 1px solid var(--border-light);
+  padding: 0.35rem;
+}
+.diff-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  padding: 0.35rem 0.75rem;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.15s;
+}
+.diff-btn:hover { color: var(--text); border-color: var(--muted); }
+.diff-btn.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+
+/* HUD */
+.hud {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--border-light);
+  border-bottom: none;
+  padding: 0.5rem 0.75rem;
+}
+.hud-display {
+  background: var(--border-dark);
+  border: 1px solid var(--muted);
+  padding: 0.2rem 0.5rem;
+  min-width: 60px;
+  text-align: center;
+}
+.hud-num {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.6rem;
+  color: var(--danger);
+  letter-spacing: 0.05em;
+  line-height: 1;
+  text-shadow: 0 0 10px rgba(200,50,0,0.5);
+}
+.hud-label { font-size: 0.45rem; letter-spacing: 0.15em; color: var(--muted); text-transform: uppercase; text-align: center; }
+
+.reset-btn {
+  background: var(--cell);
+  border: 2px solid;
+  border-color: var(--border-light) var(--border-dark) var(--border-dark) var(--border-light);
+  width: 36px; height: 36px;
+  cursor: pointer;
+  font-size: 1.1rem;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.1s, transform 0.05s;
+  flex-shrink: 0;
+}
+.reset-btn:active {
+  border-color: var(--border-dark) var(--border-light) var(--border-light) var(--border-dark);
+  transform: scale(0.95);
+}
+
+/* Board */
+.board-wrap {
+  background: var(--panel);
+  border: 3px solid;
+  border-color: var(--border-light) var(--border-dark) var(--border-dark) var(--border-light);
+  padding: 3px;
+  position: relative;
+}
+
+#board {
+  display: grid;
+  gap: 1px;
+  background: var(--border-dark);
+}
+
+.cell {
+  width: var(--cell-size);
+  height: var(--cell-size);
+  background: var(--cell);
+  border: 2px solid;
+  border-color: var(--border-light) var(--border-dark) var(--border-dark) var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-weight: 800;
+  transition: background 0.05s;
+  position: relative;
+  overflow: hidden;
+  font-size: calc(var(--cell-size) * 0.42);
+}
+
+.cell:hover:not(.open):not(.flagged) {
+  background: #3a2c14;
+}
+
+.cell.open {
+  background: var(--cell-open);
+  border-color: var(--border-dark) var(--border-light) var(--border-light) var(--border-dark);
+  cursor: default;
+}
+
+.cell.flagged { cursor: pointer; }
+
+.cell.mine-hit {
+  background: var(--danger) !important;
+  animation: flashRed 0.3s ease;
+}
+
+@keyframes flashRed {
+  0% { background: #ff6633; }
+  100% { background: var(--danger); }
+}
+
+.cell.mine-reveal { background: #2a1a0a; }
+.cell.safe-reveal { background: #1a2e1a; }
+
+/* Number colors */
+.n1 { color: #4488ff; }
+.n2 { color: #44bb66; }
+.n3 { color: #ee4433; }
+.n4 { color: #7733cc; }
+.n5 { color: #cc3300; }
+.n6 { color: #22bbcc; }
+.n7 { color: #cc22aa; }
+.n8 { color: #888888; }
+
+/* Overlay */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10,8,3,0.92);
+  z-index: 10;
+  gap: 0.6rem;
+  transition: opacity 0.3s;
+}
+.overlay.hidden { opacity: 0; pointer-events: none; }
+
+.ov-emoji { font-size: 3rem; line-height: 1; margin-bottom: 0.25rem; }
+.ov-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(1.8rem, 6vw, 2.8rem);
+  letter-spacing: 0.06em;
+  line-height: 1;
+}
+.ov-time { font-size: 0.65rem; letter-spacing: 0.15em; color: var(--muted); }
+.ov-best { font-size: 0.6rem; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 0.75rem; }
+
+.btn {
+  background: var(--accent);
+  border: none;
+  color: var(--bg);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  padding: 0.6rem 1.75rem;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: background 0.15s, transform 0.05s;
+}
+.btn:hover { background: var(--accent2); }
+.btn:active { transform: scale(0.97); }
+
+.hint {
+  font-size: 0.55rem;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  text-align: center;
+  margin-top: 0.25rem;
+}
+.hint span { color: rgba(232,213,160,0.4); }
+
+/* Best times display */
+.best-row {
+  display: flex;
+  gap: 1.5rem;
+  font-size: 0.58rem;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+}
+.best-item span { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div class="series-tag">6 Days · 6 Games · Day 03</div>
+    <div class="game-title">MINESWEEPER</div>
+  </div>
+
+  <div class="diff-bar">
+    <button class="diff-btn active" onclick="setDiff('easy')" id="btn-easy">Easy</button>
+    <button class="diff-btn" onclick="setDiff('medium')" id="btn-medium">Medium</button>
+    <button class="diff-btn" onclick="setDiff('hard')" id="btn-hard">Hard</button>
+  </div>
+
+  <div style="width:100%; max-width: fit-content;">
+    <div class="hud" id="hud">
+      <div class="hud-display">
+        <div class="hud-num" id="mineCount">010</div>
+        <div class="hud-label">💣 mines</div>
+      </div>
+      <button class="reset-btn" id="resetBtn" onclick="newGame()" title="New Game">🙂</button>
+      <div class="hud-display">
+        <div class="hud-num" id="timer" style="color:var(--accent)">000</div>
+        <div class="hud-label">⏱ time</div>
+      </div>
+    </div>
+
+    <div class="board-wrap">
+      <div id="board"></div>
+      <div class="overlay" id="overlay">
+        <div class="ov-emoji">💣</div>
+        <div class="ov-title" style="color:var(--accent)">MINESWEEPER</div>
+        <div style="font-size:0.6rem;letter-spacing:0.12em;color:var(--muted);margin-bottom:1rem">CLASSIC · LEFT CLICK REVEAL · RIGHT CLICK FLAG</div>
+        <button class="btn" onclick="newGame()">▶ New Game</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="best-row" id="bestRow">
+    <div class="best-item">EASY <span id="best-easy">--:--</span></div>
+    <div class="best-item">MED <span id="best-medium">--:--</span></div>
+    <div class="best-item">HARD <span id="best-hard">--:--</span></div>
+  </div>
+
+  <div class="hint">
+    <span>Left click</span> reveal &nbsp;·&nbsp; <span>Right click</span> flag &nbsp;·&nbsp; <span>Long press</span> flag (mobile)
+  </div>
+</div>
+
+<script>
+const DIFFS = {
+  easy:   { rows: 9,  cols: 9,  mines: 10 },
+  medium: { rows: 16, cols: 16, mines: 40 },
+  hard:   { rows: 16, cols: 30, mines: 99 },
+};
+
+let diff = 'easy';
+let board = [], rows, cols, mines;
+let gameState = 'idle'; // idle | playing | won | lost
+let flagCount = 0;
+let timerVal = 0, timerInterval = null;
+let firstClick = true;
+let longPressTimer = null;
+
+function setDiff(d) {
+  diff = d;
+  document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-' + d).classList.add('active');
+  newGame();
+}
+
+function newGame() {
+  clearInterval(timerInterval);
+  timerVal = 0;
+  firstClick = true;
+  flagCount = 0;
+  gameState = 'idle';
+
+  const cfg = DIFFS[diff];
+  rows = cfg.rows; cols = cfg.cols; mines = cfg.mines;
+
+  // Cell size
+  const maxW = Math.min(window.innerWidth - 40, cols <= 9 ? 360 : cols <= 16 ? 480 : 640);
+  const cellSize = Math.floor((maxW - cols) / cols);
+  document.documentElement.style.setProperty('--cell-size', cellSize + 'px');
+
+  // Sync HUD width
+  document.getElementById('hud').style.width = (cols * (cellSize + 1) + 5) + 'px';
+
+  // Init board data
+  board = [];
+  for (let r = 0; r < rows; r++) {
+    board[r] = [];
+    for (let c = 0; c < cols; c++) {
+      board[r][c] = { mine: false, open: false, flagged: false, count: 0 };
+    }
+  }
+
+  updateMineCounter();
+  updateTimer(0);
+  document.getElementById('resetBtn').textContent = '🙂';
+  renderBoard();
+  showOverlay(false);
+}
+
+function placeMines(safeR, safeC) {
+  let placed = 0;
+  while (placed < mines) {
+    const r = Math.floor(Math.random() * rows);
+    const c = Math.floor(Math.random() * cols);
+    if (board[r][c].mine) continue;
+    if (Math.abs(r - safeR) <= 1 && Math.abs(c - safeC) <= 1) continue;
+    board[r][c].mine = true;
+    placed++;
+  }
+  // Count neighbors
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++)
+      board[r][c].count = neighbors(r, c).filter(([nr,nc]) => board[nr][nc].mine).length;
+}
+
+function neighbors(r, c) {
+  const res = [];
+  for (let dr = -1; dr <= 1; dr++)
+    for (let dc = -1; dc <= 1; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      const nr = r + dr, nc = c + dc;
+      if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) res.push([nr, nc]);
+    }
+  return res;
+}
+
+function renderBoard() {
+  const boardEl = document.getElementById('board');
+  boardEl.style.gridTemplateColumns = `repeat(${cols}, var(--cell-size))`;
+  boardEl.innerHTML = '';
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.dataset.r = r;
+      cell.dataset.c = c;
+      boardEl.appendChild(cell);
+    }
+  }
+
+  addCellListeners();
+}
+
+function addCellListeners() {
+  document.querySelectorAll('.cell').forEach(el => {
+    el.addEventListener('click', e => {
+      const r = +el.dataset.r, c = +el.dataset.c;
+      handleReveal(r, c);
+    });
+    el.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      const r = +el.dataset.r, c = +el.dataset.c;
+      handleFlag(r, c);
+    });
+    // Long press for mobile
+    el.addEventListener('touchstart', e => {
+      longPressTimer = setTimeout(() => {
+        longPressTimer = null;
+        const r = +el.dataset.r, c = +el.dataset.c;
+        handleFlag(r, c);
+      }, 500);
+    }, { passive: true });
+    el.addEventListener('touchend', () => {
+      if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+    });
+    el.addEventListener('touchmove', () => {
+      if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+    });
+  });
+}
+
+function handleReveal(r, c) {
+  if (gameState === 'won' || gameState === 'lost') return;
+  const cell = board[r][c];
+  if (cell.flagged || cell.open) return;
+
+  if (firstClick) {
+    firstClick = false;
+    gameState = 'playing';
+    placeMines(r, c);
+    startTimer();
+  }
+
+  if (cell.mine) {
+    loseGame(r, c);
+    return;
+  }
+
+  reveal(r, c);
+  checkWin();
+}
+
+function reveal(r, c) {
+  const cell = board[r][c];
+  if (cell.open || cell.flagged || cell.mine) return;
+  cell.open = true;
+  updateCell(r, c);
+
+  if (cell.count === 0) {
+    neighbors(r, c).forEach(([nr, nc]) => reveal(nr, nc));
+  }
+}
+
+function handleFlag(r, c) {
+  if (gameState === 'won' || gameState === 'lost') return;
+  if (gameState === 'idle') return;
+  const cell = board[r][c];
+  if (cell.open) return;
+
+  cell.flagged = !cell.flagged;
+  flagCount += cell.flagged ? 1 : -1;
+  updateCell(r, c);
+  updateMineCounter();
+}
+
+function updateCell(r, c) {
+  const cell = board[r][c];
+  const el = document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
+  if (!el) return;
+
+  el.className = 'cell';
+  el.textContent = '';
+
+  if (cell.flagged && !cell.open) {
+    el.textContent = '🚩';
+    el.classList.add('flagged');
+  } else if (cell.open) {
+    el.classList.add('open');
+    if (cell.mine) {
+      el.textContent = '💣';
+    } else if (cell.count > 0) {
+      el.textContent = cell.count;
+      el.classList.add('n' + cell.count);
+    }
+  }
+}
+
+function loseGame(hitR, hitC) {
+  gameState = 'lost';
+  clearInterval(timerInterval);
+  document.getElementById('resetBtn').textContent = '😵';
+
+  // Reveal hit mine first
+  const hitEl = document.querySelector(`.cell[data-r="${hitR}"][data-c="${hitC}"]`);
+  if (hitEl) { hitEl.classList.add('mine-hit'); hitEl.textContent = '💣'; }
+
+  // Cascade reveal all mines with delay
+  let delay = 0;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const cell = board[r][c];
+      if (cell.mine && !(r === hitR && c === hitC)) {
+        const el = document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
+        if (el) {
+          setTimeout(() => {
+            el.classList.add('mine-reveal');
+            el.textContent = cell.flagged ? '🚩' : '💣';
+            el.classList.remove('flagged');
+          }, delay);
+          delay += 15;
+        }
+      }
+      // Wrong flags
+      if (cell.flagged && !cell.mine) {
+        const el = document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
+        setTimeout(() => { if (el) el.textContent = '❌'; }, delay);
+      }
+    }
+  }
+
+  setTimeout(() => {
+    showGameOver(false);
+  }, delay + 400);
+}
+
+function checkWin() {
+  const unopened = board.flat().filter(c => !c.open && !c.mine).length;
+  if (unopened === 0) {
+    gameState = 'won';
+    clearInterval(timerInterval);
+    document.getElementById('resetBtn').textContent = '😎';
+
+    // Flag all mines
+    for (let r = 0; r < rows; r++)
+      for (let c = 0; c < cols; c++)
+        if (board[r][c].mine) {
+          board[r][c].flagged = true;
+          updateCell(r, c);
+        }
+
+    // Save best
+    const key = 'ms-best-' + diff;
+    const prev = localStorage.getItem(key);
+    if (!prev || timerVal < parseInt(prev)) {
+      localStorage.setItem(key, timerVal);
+    }
+    updateBestDisplay();
+    setTimeout(() => showGameOver(true), 500);
+  }
+}
+
+function showGameOver(won) {
+  const overlay = document.getElementById('overlay');
+  overlay.innerHTML = '';
+  overlay.classList.remove('hidden');
+
+  const emoji = document.createElement('div');
+  emoji.className = 'ov-emoji';
+  emoji.textContent = won ? '🎉' : '💥';
+
+  const title = document.createElement('div');
+  title.className = 'ov-title';
+  title.style.color = won ? 'var(--safe)' : 'var(--danger)';
+  title.textContent = won ? 'YOU WIN!' : 'BOOM!';
+
+  const timeEl = document.createElement('div');
+  timeEl.className = 'ov-time';
+  timeEl.textContent = `TIME: ${String(timerVal).padStart(3,'0')}s`;
+
+  const bestEl = document.createElement('div');
+  bestEl.className = 'ov-best';
+  const bestVal = localStorage.getItem('ms-best-' + diff);
+  bestEl.textContent = bestVal ? `BEST (${diff.toUpperCase()}) — ${bestVal}s` : '';
+
+  const btn = document.createElement('button');
+  btn.className = 'btn';
+  btn.textContent = '↻  Play Again';
+  btn.onclick = newGame;
+
+  overlay.append(emoji, title, timeEl, bestEl, btn);
+}
+
+function showOverlay(show) {
+  const overlay = document.getElementById('overlay');
+  if (show) {
+    overlay.classList.remove('hidden');
+  } else {
+    overlay.classList.add('hidden');
+  }
+}
+
+function startTimer() {
+  clearInterval(timerInterval);
+  timerVal = 0;
+  timerInterval = setInterval(() => {
+    timerVal = Math.min(999, timerVal + 1);
+    updateTimer(timerVal);
+  }, 1000);
+}
+
+function updateTimer(val) {
+  document.getElementById('timer').textContent = String(val).padStart(3, '0');
+}
+
+function updateMineCounter() {
+  const remaining = mines - flagCount;
+  document.getElementById('mineCount').textContent = String(Math.max(-99, remaining)).padStart(3, '0');
+}
+
+function updateBestDisplay() {
+  ['easy','medium','hard'].forEach(d => {
+    const val = localStorage.getItem('ms-best-' + d);
+    document.getElementById('best-' + d).textContent = val ? val + 's' : '--';
+  });
+}
+
+// Keyboard shortcut
+document.addEventListener('keydown', e => {
+  if (e.key === 'r' || e.key === 'R') newGame();
+  if (e.key === '1') setDiff('easy');
+  if (e.key === '2') setDiff('medium');
+  if (e.key === '3') setDiff('hard');
+});
+
+// Init
+updateBestDisplay();
+newGame();
+</script>
+</body>
+</html>
