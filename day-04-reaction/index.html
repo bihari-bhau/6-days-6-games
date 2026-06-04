@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>REACTION — Day 4 of 6</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f0ede8;
+  --panel: #e8e4de;
+  --ink: #1a1814;
+  --muted: #9a9590;
+  --border: #d0ccc6;
+  --red: #e03030;
+  --green: #1a9e5c;
+  --blue: #1a6ecc;
+  --orange: #e07020;
+  --purple: #7030c0;
+  --yellow: #d0a010;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Inter', sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem 1rem;
+  overflow: hidden;
+}
+
+.wrap { display: flex; flex-direction: column; align-items: center; gap: 1.25rem; width: 100%; max-width: 480px; }
+
+/* Header */
+.header { text-align: center; }
+.series-tag { font-family: 'Space Mono', monospace; font-size: 0.58rem; letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase; margin-bottom: 0.4rem; }
+.game-title {
+  font-size: clamp(2.8rem, 10vw, 4.5rem);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  color: var(--ink);
+  line-height: 1;
+}
+.game-title span { color: var(--red); }
+
+/* Stats row */
+.stats { display: flex; gap: 0.75rem; width: 100%; }
+.stat-card {
+  flex: 1;
+  background: white;
+  border: 1px solid var(--border);
+  padding: 0.75rem 0.5rem;
+  text-align: center;
+  border-radius: 2px;
+}
+.stat-label { font-family: 'Space Mono', monospace; font-size: 0.5rem; letter-spacing: 0.15em; color: var(--muted); text-transform: uppercase; margin-bottom: 0.2rem; }
+.stat-value { font-size: 1.3rem; font-weight: 700; color: var(--ink); letter-spacing: -0.02em; }
+.stat-value.green { color: var(--green); }
+.stat-value.red { color: var(--red); }
+
+/* Main arena */
+#arena {
+  width: 100%;
+  aspect-ratio: 1 / 0.75;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: background 0.08s;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+#arena.state-idle { background: white; }
+#arena.state-waiting { background: #fff0f0; cursor: not-allowed; }
+#arena.state-ready { background: #e8faf0; cursor: pointer; }
+#arena.state-early { background: #fff3e0; }
+#arena.state-result { background: white; }
+
+/* Ripple on click */
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  transform: scale(0);
+  animation: rippleAnim 0.5s linear;
+  background: rgba(26, 158, 92, 0.25);
+  pointer-events: none;
+}
+@keyframes rippleAnim {
+  to { transform: scale(4); opacity: 0; }
+}
+
+/* Big time display */
+.big-time {
+  font-size: clamp(4rem, 18vw, 7rem);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  transition: color 0.1s;
+}
+.big-time.fast { color: var(--green); }
+.big-time.mid  { color: var(--orange); }
+.big-time.slow { color: var(--red); }
+
+.big-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.15em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-top: 0.25rem;
+}
+
+.arena-msg {
+  font-size: clamp(1.2rem, 5vw, 1.8rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-align: center;
+  padding: 0 1.5rem;
+  line-height: 1.3;
+}
+.arena-sub {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-top: 0.5rem;
+  text-align: center;
+}
+
+/* Countdown ring */
+.ring-wrap { position: relative; width: 90px; height: 90px; margin-bottom: 0.5rem; }
+.ring-bg { fill: none; stroke: var(--border); stroke-width: 4; }
+.ring-fill { fill: none; stroke: var(--red); stroke-width: 4; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset 0.1s linear, stroke 0.3s; }
+.ring-text { font-size: 1.6rem; font-weight: 900; fill: var(--ink); text-anchor: middle; dominant-baseline: central; }
+
+/* Results breakdown */
+.results-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.4rem;
+}
+.result-dot {
+  aspect-ratio: 1;
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Space Mono', monospace;
+  font-size: clamp(0.45rem, 2vw, 0.6rem);
+  font-weight: 700;
+  border: 1px solid var(--border);
+  background: white;
+  color: var(--muted);
+  position: relative;
+  overflow: hidden;
+}
+.result-dot.done-fast { background: #e8faf0; border-color: var(--green); color: var(--green); }
+.result-dot.done-mid  { background: #fff8e8; border-color: var(--orange); color: var(--orange); }
+.result-dot.done-slow { background: #fef0f0; border-color: var(--red); color: var(--red); }
+.result-dot.current  { background: var(--ink); color: white; border-color: var(--ink); }
+
+/* Bottom actions */
+.actions { display: flex; gap: 0.75rem; width: 100%; }
+.btn {
+  flex: 1;
+  background: var(--ink);
+  color: var(--bg);
+  border: none;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.05s;
+  border-radius: 2px;
+  text-transform: uppercase;
+}
+.btn:hover { opacity: 0.85; }
+.btn:active { transform: scale(0.98); }
+.btn.ghost { background: white; color: var(--ink); border: 1px solid var(--border); }
+.btn.green-btn { background: var(--green); }
+
+/* Grade bar */
+.grade-bar {
+  width: 100%;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+.grade-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  background: linear-gradient(90deg, var(--red), var(--orange), var(--green));
+  background-size: 400px 100%;
+}
+
+.grade-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  text-transform: uppercase;
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 0.3rem;
+}
+
+/* Leaderboard mini */
+.lb { width: 100%; }
+.lb-title { font-family: 'Space Mono', monospace; font-size: 0.55rem; letter-spacing: 0.18em; color: var(--muted); text-transform: uppercase; margin-bottom: 0.5rem; }
+.lb-row {
+  display: flex;
+  align-items: center;
+  padding: 0.4rem 0.6rem;
+  background: white;
+  border: 1px solid var(--border);
+  margin-bottom: 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border-radius: 2px;
+}
+.lb-rank { width: 1.5rem; color: var(--muted); font-family: 'Space Mono', monospace; font-size: 0.55rem; }
+.lb-time { margin-left: auto; font-family: 'Space Mono', monospace; font-weight: 700; }
+.lb-time.gold   { color: #c89000; }
+.lb-time.silver { color: #8899aa; }
+.lb-time.bronze { color: #aa7040; }
+
+/* Phase dot indicator */
+.phase-dots { display: flex; gap: 6px; }
+.phase-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border); transition: background 0.2s; }
+.phase-dot.active { background: var(--ink); }
+
+/* Animations */
+@keyframes pulseGreen {
+  0%,100% { box-shadow: 0 0 0 0 rgba(26,158,92,0.4); }
+  50%      { box-shadow: 0 0 0 12px rgba(26,158,92,0); }
+}
+#arena.state-ready { animation: pulseGreen 1s infinite; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <div class="series-tag">6 Days · 6 Games · Day 04</div>
+    <div class="game-title">REACT<span>.</span></div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-label">Best</div>
+      <div class="stat-value green" id="bestStat">---</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Average</div>
+      <div class="stat-value" id="avgStat">---</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Round</div>
+      <div class="stat-value" id="roundStat">0/5</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Grade</div>
+      <div class="stat-value" id="gradeStat">—</div>
+    </div>
+  </div>
+
+  <!-- Round dots -->
+  <div class="results-grid" id="resultsGrid"></div>
+
+  <!-- Arena -->
+  <div id="arena" onclick="handleClick(event)">
+    <div class="arena-msg" id="arenaMsg">Click to Start</div>
+    <div class="arena-sub" id="arenaSub">Test your reaction time · 5 rounds</div>
+  </div>
+
+  <!-- Grade bar (hidden until results) -->
+  <div style="width:100%;display:none" id="gradeWrap">
+    <div class="grade-label"><span>Slow</span><span id="gradeText">—</span><span>Fast</span></div>
+    <div class="grade-bar"><div class="grade-fill" id="gradeFill" style="width:0%"></div></div>
+  </div>
+
+  <!-- Actions -->
+  <div class="actions" id="actions" style="display:none">
+    <button class="btn ghost" onclick="showLeaderboard()">🏆 Scores</button>
+    <button class="btn green-btn" onclick="startSession()">↻ Play Again</button>
+  </div>
+
+</div>
+
+<script>
+const ROUNDS = 5;
+const MIN_WAIT = 1500;
+const MAX_WAIT = 5000;
+
+let state = 'idle'; // idle | waiting | ready | early | result | done
+let waitTimeout = null;
+let startTime = null;
+let round = 0;
+let times = [];
+let bestAll = [];
+
+function loadBest() {
+  try { bestAll = JSON.parse(localStorage.getItem('reaction-bests') || '[]'); } catch(e) { bestAll = []; }
+}
+function saveBest(avg) {
+  bestAll.push(avg);
+  bestAll.sort((a,b)=>a-b);
+  bestAll = bestAll.slice(0,5);
+  localStorage.setItem('reaction-bests', JSON.stringify(bestAll));
+}
+
+function getGrade(ms) {
+  if (ms < 180) return { label: 'ELITE', color: '#1a9e5c' };
+  if (ms < 220) return { label: 'GREAT', color: '#2a8e4c' };
+  if (ms < 270) return { label: 'GOOD', color: '#e07020' };
+  if (ms < 350) return { label: 'OK', color: '#cc6010' };
+  return { label: 'SLOW', color: '#e03030' };
+}
+
+function getTimeClass(ms) {
+  if (ms < 220) return 'fast';
+  if (ms < 320) return 'mid';
+  return 'slow';
+}
+
+function getDotClass(ms) {
+  if (ms < 220) return 'done-fast';
+  if (ms < 320) return 'done-mid';
+  return 'done-slow';
+}
+
+function buildGrid() {
+  const grid = document.getElementById('resultsGrid');
+  grid.innerHTML = '';
+  for (let i = 0; i < ROUNDS; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'result-dot' + (i === round ? ' current' : '');
+    dot.id = 'dot-' + i;
+    if (times[i]) {
+      dot.className = 'result-dot ' + getDotClass(times[i]);
+      dot.textContent = times[i] + 'ms';
+    } else if (i === round && state !== 'idle' && state !== 'done') {
+      dot.textContent = '•';
+    } else {
+      dot.textContent = i + 1;
+    }
+    grid.appendChild(dot);
+  }
+}
+
+function startSession() {
+  loadBest();
+  round = 0;
+  times = [];
+  state = 'idle';
+  document.getElementById('actions').style.display = 'none';
+  document.getElementById('gradeWrap').style.display = 'none';
+  document.getElementById('gradeStat').textContent = '—';
+  document.getElementById('avgStat').textContent = '---';
+  buildGrid();
+  updateStats();
+  setArena('waiting');
+  nextRound();
+}
+
+function nextRound() {
+  if (round >= ROUNDS) { endSession(); return; }
+  state = 'waiting';
+  setArena('waiting');
+  buildGrid();
+  clearTimeout(waitTimeout);
+  const delay = MIN_WAIT + Math.random() * (MAX_WAIT - MIN_WAIT);
+  waitTimeout = setTimeout(showGo, delay);
+}
+
+function showGo() {
+  if (state !== 'waiting') return;
+  state = 'ready';
+  startTime = performance.now();
+  setArena('ready');
+}
+
+function handleClick(e) {
+  if (state === 'idle') { startSession(); return; }
+  if (state === 'waiting') {
+    // Too early!
+    clearTimeout(waitTimeout);
+    state = 'early';
+    setArena('early');
+    // penalize: add 600ms
+    times.push(600);
+    updateDot(round, 600);
+    round++;
+    buildGrid();
+    updateStats();
+    setTimeout(() => nextRound(), 1200);
+    return;
+  }
+  if (state === 'ready') {
+    const rt = Math.round(performance.now() - startTime);
+    times.push(rt);
+    state = 'result';
+    updateDot(round, rt);
+    round++;
+    buildGrid();
+    showResult(rt);
+    updateStats();
+    spawnRipple(e);
+    return;
+  }
+  if (state === 'result') {
+    nextRound();
+    return;
+  }
+  if (state === 'done') { startSession(); return; }
+}
+
+function updateDot(idx, ms) {
+  const dot = document.getElementById('dot-' + idx);
+  if (dot) {
+    dot.className = 'result-dot ' + getDotClass(ms);
+    dot.textContent = ms + 'ms';
+  }
+}
+
+function showResult(ms) {
+  const arena = document.getElementById('arena');
+  arena.className = 'state-result';
+
+  const g = getGrade(ms);
+  const tc = getTimeClass(ms);
+
+  document.getElementById('arenaMsg').innerHTML =
+    `<span class="big-time ${tc}" style="display:block">${ms}</span><span class="big-label">milliseconds</span>`;
+
+  const more = round < ROUNDS ? `Round ${round} of ${ROUNDS} · Click to continue` : 'Click to see results';
+  document.getElementById('arenaSub').textContent = `${g.label} · ${more}`;
+
+  state = 'result';
+}
+
+function endSession() {
+  state = 'done';
+  const valid = times.filter(t => t < 600);
+  const avg = valid.length ? Math.round(valid.reduce((a,b)=>a+b,0)/valid.length) : 600;
+  const best = valid.length ? Math.min(...valid) : 600;
+
+  saveBest(avg);
+  loadBest();
+
+  const g = getGrade(avg);
+  const arena = document.getElementById('arena');
+  arena.className = 'state-result';
+
+  document.getElementById('arenaMsg').innerHTML =
+    `<div style="font-size:clamp(1rem,4vw,1.4rem);font-weight:900;letter-spacing:-0.02em;color:${g.color}">${g.label}</div>
+     <div style="font-size:clamp(2.5rem,12vw,5rem);font-weight:900;letter-spacing:-0.04em;line-height:1">${avg}<span style="font-size:1rem;font-weight:400;color:var(--muted)">ms avg</span></div>`;
+  document.getElementById('arenaSub').textContent = `Best: ${best}ms · ${valid.length}/${ROUNDS} clean rounds`;
+
+  document.getElementById('gradeStat').textContent = g.label;
+  document.getElementById('gradeStat').style.color = g.color;
+
+  // Grade bar
+  const pct = Math.max(5, Math.min(100, Math.round((600 - avg) / (600 - 150) * 100)));
+  document.getElementById('gradeWrap').style.display = 'block';
+  document.getElementById('gradeText').textContent = g.label;
+  setTimeout(() => { document.getElementById('gradeFill').style.width = pct + '%'; }, 100);
+
+  document.getElementById('actions').style.display = 'flex';
+  updateStats();
+}
+
+function updateStats() {
+  loadBest();
+  const valid = times.filter(t => t < 600);
+  const avg = valid.length ? Math.round(valid.reduce((a,b)=>a+b,0)/valid.length) : null;
+  const best = valid.length ? Math.min(...valid) : null;
+
+  document.getElementById('roundStat').textContent = round + '/' + ROUNDS;
+  document.getElementById('avgStat').textContent = avg ? avg + 'ms' : '---';
+  document.getElementById('bestStat').textContent = (bestAll.length ? bestAll[0] : (best || '---')) + (bestAll.length || best ? 'ms' : '');
+}
+
+function setArena(s) {
+  const arena = document.getElementById('arena');
+  arena.className = 'state-' + s;
+
+  const msg = document.getElementById('arenaMsg');
+  const sub = document.getElementById('arenaSub');
+
+  if (s === 'waiting') {
+    msg.innerHTML = `<div style="font-size:3rem">⏳</div>`;
+    sub.textContent = `Round ${round + 1} of ${ROUNDS} · Wait for green…`;
+  } else if (s === 'ready') {
+    msg.innerHTML = `<div style="font-size:3.5rem">🟢</div><div style="font-size:1.4rem;font-weight:900;color:var(--green);margin-top:0.25rem">NOW!</div>`;
+    sub.textContent = 'Click / tap as fast as you can!';
+  } else if (s === 'early') {
+    msg.innerHTML = `<div style="font-size:3rem">⚡</div><div style="font-size:1.2rem;font-weight:900;color:var(--orange);margin-top:0.25rem">TOO EARLY!</div>`;
+    sub.textContent = '+600ms penalty — wait for green next time';
+  }
+}
+
+function spawnRipple(e) {
+  const arena = document.getElementById('arena');
+  const rect = arena.getBoundingClientRect();
+  const x = (e.clientX || rect.left + rect.width/2) - rect.left;
+  const y = (e.clientY || rect.top + rect.height/2) - rect.top;
+  const size = Math.max(rect.width, rect.height) * 2;
+  const ripple = document.createElement('div');
+  ripple.className = 'ripple';
+  ripple.style.cssText = `width:${size}px;height:${size}px;left:${x-size/2}px;top:${y-size/2}px`;
+  arena.appendChild(ripple);
+  ripple.addEventListener('animationend', () => ripple.remove());
+}
+
+function showLeaderboard() {
+  loadBest();
+  const arena = document.getElementById('arena');
+  arena.className = 'state-result';
+  const medals = ['gold','silver','bronze','',''];
+  const medalEmoji = ['🥇','🥈','🥉','4.','5.'];
+  let html = `<div style="width:100%;padding:0 1rem">
+    <div style="font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:0.18em;color:var(--muted);text-transform:uppercase;margin-bottom:0.75rem">Top Averages</div>`;
+  if (bestAll.length === 0) {
+    html += `<div style="color:var(--muted);font-size:0.8rem;text-align:center;padding:1rem">No records yet</div>`;
+  } else {
+    bestAll.forEach((t, i) => {
+      const g = getGrade(t);
+      html += `<div class="lb-row">
+        <span class="lb-rank">${medalEmoji[i]}</span>
+        <span>${g.label}</span>
+        <span class="lb-time ${medals[i]}">${t}ms</span>
+      </div>`;
+    });
+  }
+  html += `</div>`;
+  document.getElementById('arenaMsg').innerHTML = html;
+  document.getElementById('arenaSub').textContent = 'Click to play again';
+  state = 'done';
+}
+
+// Keyboard support
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' || e.code === 'Enter') {
+    e.preventDefault();
+    handleClick({ clientX: null, clientY: null });
+  }
+});
+
+// Init
+loadBest();
+buildGrid();
+updateStats();
+document.getElementById('arenaMsg').textContent = 'Click to Start';
+document.getElementById('arenaSub').textContent = 'Test your reaction time · 5 rounds';
+</script>
+</body>
+</html>
