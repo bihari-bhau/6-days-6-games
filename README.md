@@ -11,7 +11,7 @@ One mini game a day for 6 days. Each game is a single `index.html` — no depend
 | 02 | 🧱 Breakout | ✅ Live |
 | 03 | 💣 Minesweeper | ✅ Live |
 | 04 | 🎯 Reaction Tester | ✅ Live |
-| 05 | 🔢 2048 | Coming |
+| 05 | 🔢 2048 | ✅ Live |
 | 06 | 👾 Space Shooter | Coming |
 
 ## Deploy
